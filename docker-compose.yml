@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jarvis_dev_password}
+      POSTGRES_DB: jarvis
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      JARVIS_ENVIRONMENT: ${JARVIS_ENVIRONMENT:-development}
+      JARVIS_DATABASE_URL: postgresql+asyncpg://jarvis:${POSTGRES_PASSWORD:-jarvis_dev_password}@db:5432/jarvis
+      JARVIS_JWT_SECRET_KEY: ${JARVIS_JWT_SECRET_KEY:-}
+      JARVIS_ENCRYPTION_KEY: ${JARVIS_ENCRYPTION_KEY:-}
+      JARVIS_CORS_ORIGINS: ${JARVIS_CORS_ORIGINS:-http://localhost:8080}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
