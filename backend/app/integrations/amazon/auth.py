@@ -39,10 +39,16 @@ class LWATokenProvider:
         self._access_token: str | None = None
         self._expires_at: float = 0.0
 
+    @property
+    def _masked_client_id(self) -> str:
+        return f"...{self._client_id[-6:]}" if len(self._client_id) > 6 else "***"
+
     async def get_access_token(self) -> str:
         if self._access_token is not None and time.monotonic() < self._expires_at:
+            logger.debug("LWA access token cache hit (client=%s)", self._masked_client_id)
             return self._access_token
 
+        logger.info("Refreshing LWA access token (client=%s)", self._masked_client_id)
         try:
             response = await self._http.post(
                 LWA_TOKEN_URL,
@@ -55,11 +61,17 @@ class LWATokenProvider:
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
         except httpx.HTTPError as exc:
+            logger.error(
+                "LWA token refresh: connection error (client=%s): %s", self._masked_client_id, exc
+            )
             raise SPAPIAuthError(f"Could not reach Login-with-Amazon: {exc}") from exc
 
         if response.status_code != 200:
-            logger.warning(
-                "LWA token refresh failed: %s %s", response.status_code, response.text[:300]
+            logger.error(
+                "LWA token refresh failed (client=%s): HTTP %s %s",
+                self._masked_client_id,
+                response.status_code,
+                response.text[:300],
             )
             raise SPAPIAuthError(
                 f"Login-with-Amazon refused the refresh token (HTTP {response.status_code})"
@@ -69,8 +81,17 @@ class LWATokenProvider:
         access_token = payload.get("access_token")
         expires_in = payload.get("expires_in", 3600)
         if not access_token:
+            logger.error(
+                "LWA token refresh (client=%s): 200 response had no access_token",
+                self._masked_client_id,
+            )
             raise SPAPIAuthError("Login-with-Amazon response had no access_token")
 
         self._access_token = access_token
         self._expires_at = time.monotonic() + max(expires_in - EXPIRY_SAFETY_MARGIN_SECONDS, 30)
+        logger.info(
+            "LWA access token refreshed (client=%s, expires_in=%ss)",
+            self._masked_client_id,
+            expires_in,
+        )
         return access_token

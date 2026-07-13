@@ -109,6 +109,7 @@ npm run build                     # strict TypeScript compile + production build
 - [API reference](docs/api.md)
 - [Developer guide](docs/development.md)
 - [Administrator guide](docs/administration.md)
+- [Validating the Amazon integration against a real account](docs/amazon-validation.md)
 
 ## Amazon integration
 
@@ -126,11 +127,15 @@ stores them encrypted at rest with `JARVIS_ENCRYPTION_KEY`. Trigger a sync
 with `POST /api/v1/amazon/credentials/{id}/sync` (`recurring: true` keeps
 it running every `JARVIS_AMAZON_SYNC_INTERVAL_MINUTES`, default 30).
 
+Everything above is covered by 84 automated tests against a scripted fake
+API — before relying on it, validate it against your real seller account:
+see [docs/amazon-validation.md](docs/amazon-validation.md).
+
 ## Roadmap
 
 - **Phase 1 — Foundation** ✅ architecture, database, authentication, dashboard shell, core backend
 - **Phase 2 — AI brain** ✅ Claude reasoning engine, long-term memory, chat, planning engine, workflow engine, all six agents
-- **Phase 3a — Amazon SP-API integration** ✅ orders, sales, FBA inventory, FBA shipments, financial events
+- **Phase 3a — Amazon SP-API integration** ✅ built, tested against a fake API; ⏳ pending validation against a real seller account (see above)
 - **Phase 3b — Amazon Ads API**: campaigns, keywords, search terms, ACOS/ROAS/CTR/CPC/spend
 - **Phase 3c — Enterprise dashboard**: live KPI cards, revenue charts, profit tracking, inventory heat map, PPC analytics
 - **Phase 3d — AI automation & voice**: PPC optimization, restock forecasting, listing quality, daily reports, voice assistant

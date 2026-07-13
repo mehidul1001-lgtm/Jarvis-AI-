@@ -163,10 +163,22 @@ class AmazonSyncService:
         cursor_after = state.cursor_after or self._default_lookback()
         latest_seen = cursor_after
         next_token = state.next_token
+        logger.info(
+            "Amazon sync 'orders' started (credential=%s '%s', created_after=%s)",
+            self.credential.id,
+            self.credential.label,
+            cursor_after.isoformat(),
+        )
         try:
-            for _page_num in range(MAX_PAGES_PER_SYNC):
+            for page_num in range(1, MAX_PAGES_PER_SYNC + 1):
                 page = await self.client.list_orders(
                     created_after=cursor_after, next_token=next_token
+                )
+                logger.info(
+                    "Amazon sync 'orders' page %s: %s order(s) (credential=%s)",
+                    page_num,
+                    len(page.items),
+                    self.credential.id,
                 )
                 for raw in page.items:
                     order, created = await self._upsert_order(raw)
@@ -189,9 +201,20 @@ class AmazonSyncService:
             state.cursor_after = latest_seen
             state.status = SyncStatus.IDLE
             state.last_error = None
+            logger.info(
+                "Amazon sync 'orders' completed: created=%s updated=%s (credential=%s)",
+                result.created,
+                result.updated,
+                self.credential.id,
+            )
         except Exception as exc:
             state.status = SyncStatus.ERROR
             state.last_error = str(exc)[:2000]
+            logger.exception(
+                "Amazon sync 'orders' failed (credential=%s '%s')",
+                self.credential.id,
+                self.credential.label,
+            )
             raise
         finally:
             state.last_synced_at = datetime.now(UTC)
@@ -265,9 +288,21 @@ class AmazonSyncService:
         result = SyncResult(resource="inventory")
         snapshot_at = datetime.now(UTC)
         next_token = state.next_token
+        logger.info(
+            "Amazon sync 'inventory' started (credential=%s '%s')",
+            self.credential.id,
+            self.credential.label,
+        )
         try:
-            for _page_num in range(MAX_PAGES_PER_SYNC):
+            for page_num in range(1, MAX_PAGES_PER_SYNC + 1):
                 page = await self.client.list_inventory_summaries(next_token=next_token)
+                logger.info(
+                    "Amazon sync 'inventory' page %s: %s summar%s (credential=%s)",
+                    page_num,
+                    len(page.items),
+                    "y" if len(page.items) == 1 else "ies",
+                    self.credential.id,
+                )
                 for raw in page.items:
                     details = raw.get("inventoryDetails") or {}
                     self.db.add(
@@ -299,9 +334,19 @@ class AmazonSyncService:
                     break
             state.status = SyncStatus.IDLE
             state.last_error = None
+            logger.info(
+                "Amazon sync 'inventory' completed: %s snapshot(s) written (credential=%s)",
+                result.created,
+                self.credential.id,
+            )
         except Exception as exc:
             state.status = SyncStatus.ERROR
             state.last_error = str(exc)[:2000]
+            logger.exception(
+                "Amazon sync 'inventory' failed (credential=%s '%s')",
+                self.credential.id,
+                self.credential.label,
+            )
             raise
         finally:
             state.last_synced_at = datetime.now(UTC)
@@ -318,9 +363,20 @@ class AmazonSyncService:
 
         result = SyncResult(resource="fba_shipments")
         next_token = state.next_token
+        logger.info(
+            "Amazon sync 'fba_shipments' started (credential=%s '%s')",
+            self.credential.id,
+            self.credential.label,
+        )
         try:
-            for _page_num in range(MAX_PAGES_PER_SYNC):
+            for page_num in range(1, MAX_PAGES_PER_SYNC + 1):
                 page = await self.client.list_inbound_shipments(next_token=next_token)
+                logger.info(
+                    "Amazon sync 'fba_shipments' page %s: %s shipment(s) (credential=%s)",
+                    page_num,
+                    len(page.items),
+                    self.credential.id,
+                )
                 for raw in page.items:
                     values = {
                         "credential_id": self.credential.id,
@@ -356,9 +412,20 @@ class AmazonSyncService:
                     break
             state.status = SyncStatus.IDLE
             state.last_error = None
+            logger.info(
+                "Amazon sync 'fba_shipments' completed: created=%s updated=%s (credential=%s)",
+                result.created,
+                result.updated,
+                self.credential.id,
+            )
         except Exception as exc:
             state.status = SyncStatus.ERROR
             state.last_error = str(exc)[:2000]
+            logger.exception(
+                "Amazon sync 'fba_shipments' failed (credential=%s '%s')",
+                self.credential.id,
+                self.credential.label,
+            )
             raise
         finally:
             state.last_synced_at = datetime.now(UTC)
@@ -377,10 +444,22 @@ class AmazonSyncService:
         posted_after = state.cursor_after or self._default_lookback()
         latest_seen = posted_after
         next_token = state.next_token
+        logger.info(
+            "Amazon sync 'financial_events' started (credential=%s '%s', posted_after=%s)",
+            self.credential.id,
+            self.credential.label,
+            posted_after.isoformat(),
+        )
         try:
-            for _page_num in range(MAX_PAGES_PER_SYNC):
+            for page_num in range(1, MAX_PAGES_PER_SYNC + 1):
                 page = await self.client.list_financial_events(
                     posted_after=posted_after, next_token=next_token
+                )
+                logger.info(
+                    "Amazon sync 'financial_events' page %s: %s event(s) (credential=%s)",
+                    page_num,
+                    len(page.items),
+                    self.credential.id,
                 )
                 for raw in page.items:
                     created = await self._upsert_financial_event(raw)
@@ -397,9 +476,19 @@ class AmazonSyncService:
             state.cursor_after = latest_seen
             state.status = SyncStatus.IDLE
             state.last_error = None
+            logger.info(
+                "Amazon sync 'financial_events' completed: %s new event(s) (credential=%s)",
+                result.created,
+                self.credential.id,
+            )
         except Exception as exc:
             state.status = SyncStatus.ERROR
             state.last_error = str(exc)[:2000]
+            logger.exception(
+                "Amazon sync 'financial_events' failed (credential=%s '%s')",
+                self.credential.id,
+                self.credential.label,
+            )
             raise
         finally:
             state.last_synced_at = datetime.now(UTC)

@@ -67,6 +67,40 @@ async def test_lwa_token_failure_raises_auth_error():
     await http.aclose()
 
 
+# --- Sellers / marketplace verification -----------------------------------------------
+
+
+async def test_list_marketplace_participations():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth/o2/token":
+            return LWA_OK
+        assert request.url.path == "/sellers/v1/marketplaceParticipations"
+        return httpx.Response(
+            200,
+            json={
+                "payload": [
+                    {
+                        "marketplace": {
+                            "id": "ATVPDKIKX0DER",
+                            "name": "Amazon.com",
+                            "countryCode": "US",
+                            "defaultCurrencyCode": "USD",
+                        },
+                        "participation": {"isParticipating": True, "hasSuspendedListings": False},
+                    }
+                ]
+            },
+        )
+
+    client, http = _client(handler)
+    participations = await client.list_marketplace_participations()
+    assert len(participations) == 1
+    assert participations[0]["marketplace"]["id"] == "ATVPDKIKX0DER"
+    assert participations[0]["participation"]["isParticipating"] is True
+    await client.aclose()
+    await http.aclose()
+
+
 # --- Orders ------------------------------------------------------------------------
 
 

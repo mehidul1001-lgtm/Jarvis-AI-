@@ -20,6 +20,11 @@ class FakeAmazonClient:
         }
         self.order_items: dict[str, list[dict[str, Any]]] = {}
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.marketplace_participations: list[dict[str, Any]] = []
+
+    async def list_marketplace_participations(self) -> list[dict[str, Any]]:
+        self.calls.append(("list_marketplace_participations", {}))
+        return self.marketplace_participations
 
     def queue_orders(self, *pages: AmazonPage) -> None:
         self._pages["orders"].extend(pages)

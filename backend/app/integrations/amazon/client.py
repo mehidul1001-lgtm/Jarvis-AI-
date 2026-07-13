@@ -39,6 +39,8 @@ class AmazonPage:
 
 
 class AmazonAPI(Protocol):
+    async def list_marketplace_participations(self) -> list[dict[str, Any]]: ...
+
     async def list_orders(
         self, *, created_after: datetime, next_token: str | None = None
     ) -> AmazonPage: ...
@@ -95,15 +97,26 @@ class SPAPIClient:
     async def __aexit__(self, *exc: object) -> None:
         await self.aclose()
 
+    async def verify_authentication(self) -> str:
+        """Exchanges the refresh token for an access token without making any
+        other API call - isolates auth failures from data-endpoint failures
+        when diagnosing a newly connected account."""
+        return await self._token.get_access_token()
+
     # --- Low-level request plumbing -----------------------------------------
 
     async def _request(
         self, operation: str, method: str, path: str, *, params: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         last_error: Exception | None = None
-        for attempt in range(MAX_ATTEMPTS):
+        started = asyncio.get_event_loop().time()
+        for attempt in range(1, MAX_ATTEMPTS + 1):
             await self._rate_limiter.acquire(operation)
-            access_token = await self._token.get_access_token()
+            try:
+                access_token = await self._token.get_access_token()
+            except Exception:
+                logger.error("SP-API '%s': could not obtain an LWA access token", operation)
+                raise
             try:
                 response = await self._http.request(
                     method,
@@ -116,17 +129,29 @@ class SPAPIClient:
                 )
             except httpx.HTTPError as exc:
                 last_error = exc
-                logger.warning("SP-API connection error on %s; retrying", operation)
-                await asyncio.sleep(2 * (attempt + 1))
+                logger.warning(
+                    "SP-API '%s' connection error (attempt %s/%s): %s; retrying",
+                    operation,
+                    attempt,
+                    MAX_ATTEMPTS,
+                    exc,
+                )
+                await asyncio.sleep(2 * attempt)
                 continue
 
             self._rate_limiter.observe_headers(operation, dict(response.headers))
+            request_id = response.headers.get("x-amzn-requestid")
 
             if response.status_code == 429:
-                retry_after = float(response.headers.get("retry-after", 2 * (attempt + 1)))
+                retry_after = float(response.headers.get("retry-after", 2 * attempt))
                 last_error = SPAPIRateLimitError()
                 logger.warning(
-                    "SP-API rate limited on %s; retrying in %.1fs", operation, retry_after
+                    "SP-API '%s' rate limited (attempt %s/%s, request-id=%s); retrying in %.1fs",
+                    operation,
+                    attempt,
+                    MAX_ATTEMPTS,
+                    request_id,
+                    retry_after,
                 )
                 await asyncio.sleep(min(retry_after, 30))
                 continue
@@ -134,16 +159,43 @@ class SPAPIClient:
                 last_error = SPAPIError(
                     f"SP-API server error {response.status_code} on {operation}"
                 )
-                await asyncio.sleep(2 * (attempt + 1))
+                logger.warning(
+                    "SP-API '%s' server error %s (attempt %s/%s, request-id=%s); retrying",
+                    operation,
+                    response.status_code,
+                    attempt,
+                    MAX_ATTEMPTS,
+                    request_id,
+                )
+                await asyncio.sleep(2 * attempt)
                 continue
             if response.status_code >= 400:
                 detail = response.text[:500]
+                logger.error(
+                    "SP-API '%s' rejected: HTTP %s (request-id=%s): %s",
+                    operation,
+                    response.status_code,
+                    request_id,
+                    detail,
+                )
                 raise SPAPIError(
                     f"SP-API rejected {operation} (HTTP {response.status_code}): {detail}"
                 )
 
+            elapsed_ms = round((asyncio.get_event_loop().time() - started) * 1000, 1)
+            logger.info(
+                "SP-API '%s' succeeded (attempt %s/%s, %sms, request-id=%s)",
+                operation,
+                attempt,
+                MAX_ATTEMPTS,
+                elapsed_ms,
+                request_id,
+            )
             return response.json()
 
+        logger.error(
+            "SP-API '%s' failed after %s attempts: %s", operation, MAX_ATTEMPTS, last_error
+        )
         raise SPAPIError(
             f"SP-API request '{operation}' failed after {MAX_ATTEMPTS} attempts"
         ) from (last_error)
@@ -153,6 +205,18 @@ class SPAPIClient:
         """SP-API v0 endpoints wrap the body in {"payload": ...}; v1 endpoints
         (e.g. FBA Inventory) return the body directly. Handle both."""
         return payload.get("payload", payload)
+
+    # --- Sellers v1 ------------------------------------------------------------
+
+    async def list_marketplace_participations(self) -> list[dict[str, Any]]:
+        """Which marketplaces these credentials are actually authorized for -
+        the documented way to confirm auth + marketplace/region are correct
+        before trusting any other endpoint's data."""
+        raw = await self._request(
+            "sellers.marketplace_participations", "GET", "/sellers/v1/marketplaceParticipations"
+        )
+        payload = raw.get("payload", raw)
+        return payload if isinstance(payload, list) else []
 
     # --- Orders v0 -----------------------------------------------------------
 
