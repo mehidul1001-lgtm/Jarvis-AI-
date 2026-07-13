@@ -7,6 +7,8 @@ import logging
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
+from app.middleware.request_context import SECURITY_HEADERS
+
 logger = logging.getLogger("jarvis.errors")
 
 
@@ -83,8 +85,22 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
-        # Never leak internals to the client; log the full traceback instead.
-        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        # Starlette's ServerErrorMiddleware sits outside RequestContextMiddleware,
+        # so on an unhandled exception that middleware's post-call_next code
+        # (request-id header, security headers, completion log) never runs.
+        # Reapply it here so 500 responses stay consistent with every other
+        # response. Never leak internals to the client; log the full
+        # traceback instead.
+        request_id = getattr(request.state, "request_id", None)
+        logger.exception(
+            "Unhandled error on %s %s",
+            request.method,
+            request.url.path,
+            extra={"request_id": request_id, "method": request.method, "path": request.url.path},
+        )
+        headers = dict(SECURITY_HEADERS)
+        if request_id:
+            headers["X-Request-ID"] = request_id
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
@@ -93,4 +109,5 @@ def register_exception_handlers(app: FastAPI) -> None:
                     "message": "An internal error occurred",
                 }
             },
+            headers=headers,
         )

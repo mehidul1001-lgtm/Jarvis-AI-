@@ -79,6 +79,19 @@ docker compose up --build
 
 Then open http://localhost:8080.
 
+## Windows
+
+Docker Desktop (WSL2 backend) runs the stack unmodified — `docker compose up
+--build` works as-is in PowerShell or cmd, since `docker-compose.yml` uses a
+named volume rather than a host bind mount. For a native (non-Docker)
+backend setup, every dependency in `requirements.txt` ships a prebuilt
+Windows wheel (`uvicorn[standard]`'s `uvloop` extra is correctly skipped on
+`win32` via its own platform marker — Windows falls back to asyncio's
+default event loop), and no part of the stack depends on a bash-only
+script. Swap the venv paths in the steps above for their Windows
+equivalents: `.venv\Scripts\pip.exe`, `.venv\Scripts\alembic.exe`,
+`.venv\Scripts\uvicorn.exe` (or run `.venv\Scripts\activate` first).
+
 ## Testing
 
 ```bash
