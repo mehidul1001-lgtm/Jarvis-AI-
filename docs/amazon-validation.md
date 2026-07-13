@@ -99,6 +99,27 @@ app uses, not a separate diagnostic shim. It:
    SKU, open shipments, and a financial-events breakdown by type.
 5. Prints a final report marking each stage `VERIFIED` or `FAILED`.
 
+### Running it under Docker Compose instead
+
+If you're running the stack via `docker compose up` rather than a local
+venv, the backend container already has network access to the `db`
+service and every dependency installed — run the script inside it instead
+of on the host (Postgres isn't published to the host in this compose
+setup, so a host-side script couldn't reach it anyway):
+
+```bash
+docker compose exec \
+  -e JARVIS_VALIDATE_USER_EMAIL=you@example.com \
+  -e AMAZON_LWA_CLIENT_ID=amzn1.application-oa2-client.... \
+  -e AMAZON_LWA_CLIENT_SECRET=... \
+  -e AMAZON_LWA_REFRESH_TOKEN=Atzr|... \
+  -e AMAZON_SELLER_ID=A1B2C3D4E5 \
+  backend python scripts/validate_amazon_live.py
+```
+
+`JARVIS_DATABASE_URL` doesn't need to be passed — the container already
+has it set to point at the `db` service via `docker-compose.yml`.
+
 ## 5. Connect the same account to the running app (optional)
 
 The validation script and the running app read the exact same environment
@@ -113,6 +134,25 @@ export AMAZON_BOOTSTRAP_USER_EMAIL=you@example.com
 
 uvicorn app.main:app --reload
 ```
+
+**Under Docker Compose**: `docker-compose.yml` passes all of these
+through to the backend container already. Create a `.env` file next to
+`docker-compose.yml` (repo root, not `backend/.env` — Compose reads its
+own) with:
+
+```
+JARVIS_JWT_SECRET_KEY=...
+JARVIS_ENCRYPTION_KEY=...
+AMAZON_LWA_CLIENT_ID=amzn1.application-oa2-client....
+AMAZON_LWA_CLIENT_SECRET=...
+AMAZON_LWA_REFRESH_TOKEN=Atzr|...
+AMAZON_SELLER_ID=A1B2C3D4E5
+AMAZON_BOOTSTRAP_USER_EMAIL=you@example.com
+```
+
+then `docker compose up -d --build` (or `docker compose restart backend`
+if it's already running) — the account connects automatically on
+startup. This root `.env` is already covered by `.gitignore`.
 
 This is optional — you can always connect (or connect additional)
 accounts through `POST /api/v1/amazon/credentials` instead, which supports

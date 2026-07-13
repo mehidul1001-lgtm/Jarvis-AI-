@@ -22,6 +22,16 @@ services:
       JARVIS_JWT_SECRET_KEY: ${JARVIS_JWT_SECRET_KEY:-}
       JARVIS_ENCRYPTION_KEY: ${JARVIS_ENCRYPTION_KEY:-}
       JARVIS_CORS_ORIGINS: ${JARVIS_CORS_ORIGINS:-http://localhost:8080}
+      # Optional Amazon credential bootstrap (see docs/amazon-validation.md).
+      # Leave unset to skip - no Amazon account is connected automatically.
+      AMAZON_LWA_CLIENT_ID: ${AMAZON_LWA_CLIENT_ID:-}
+      AMAZON_LWA_CLIENT_SECRET: ${AMAZON_LWA_CLIENT_SECRET:-}
+      AMAZON_LWA_REFRESH_TOKEN: ${AMAZON_LWA_REFRESH_TOKEN:-}
+      AMAZON_SELLER_ID: ${AMAZON_SELLER_ID:-}
+      AMAZON_REGION: ${AMAZON_REGION:-NA}
+      AMAZON_MARKETPLACE_ID: ${AMAZON_MARKETPLACE_ID:-ATVPDKIKX0DER}
+      AMAZON_CREDENTIAL_LABEL: ${AMAZON_CREDENTIAL_LABEL:-Primary Store}
+      AMAZON_BOOTSTRAP_USER_EMAIL: ${AMAZON_BOOTSTRAP_USER_EMAIL:-}
     depends_on:
       db:
         condition: service_healthy
