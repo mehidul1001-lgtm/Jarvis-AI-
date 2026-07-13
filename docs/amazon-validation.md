@@ -99,7 +99,31 @@ app uses, not a separate diagnostic shim. It:
    SKU, open shipments, and a financial-events breakdown by type.
 5. Prints a final report marking each stage `VERIFIED` or `FAILED`.
 
-## 5. Reconcile against Seller Central
+## 5. Connect the same account to the running app (optional)
+
+The validation script and the running app read the exact same environment
+variables. If you export one more — `AMAZON_BOOTSTRAP_USER_EMAIL` — and
+start (or restart) the backend with all of them set, it connects/updates
+that account automatically on every startup, no API call needed:
+
+```bash
+export AMAZON_BOOTSTRAP_USER_EMAIL=you@example.com
+# plus the same AMAZON_LWA_CLIENT_ID / _SECRET / _REFRESH_TOKEN / AMAZON_SELLER_ID
+# from step 4
+
+uvicorn app.main:app --reload
+```
+
+This is optional — you can always connect (or connect additional)
+accounts through `POST /api/v1/amazon/credentials` instead, which supports
+multiple accounts per user. The env-var path only manages one account
+(labeled "Primary Store" by default, override with `AMAZON_CREDENTIAL_LABEL`)
+and is meant for a single-store deployment where "rotate the secret" should
+mean "change the env var and restart," not a manual API call. Either way,
+the credential ends up in the same encrypted table and the rest of the app
+(sync, the REST API, the agent's data tools) can't tell the difference.
+
+## 6. Reconcile against Seller Central
 
 The script can't know whether the numbers are *right* — only you can, by
 eyeballing them against Seller Central:

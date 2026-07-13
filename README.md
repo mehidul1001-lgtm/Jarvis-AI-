@@ -127,7 +127,12 @@ stores them encrypted at rest with `JARVIS_ENCRYPTION_KEY`. Trigger a sync
 with `POST /api/v1/amazon/credentials/{id}/sync` (`recurring: true` keeps
 it running every `JARVIS_AMAZON_SYNC_INTERVAL_MINUTES`, default 30).
 
-Everything above is covered by 84 automated tests against a scripted fake
+For a single-store deployment, setting `AMAZON_LWA_CLIENT_ID`,
+`AMAZON_LWA_CLIENT_SECRET`, `AMAZON_LWA_REFRESH_TOKEN`, `AMAZON_SELLER_ID`
+and `AMAZON_BOOTSTRAP_USER_EMAIL` connects (or updates) that account
+automatically on every startup — no API call needed.
+
+Everything above is covered by 91 automated tests against a scripted fake
 API — before relying on it, validate it against your real seller account:
 see [docs/amazon-validation.md](docs/amazon-validation.md).
 

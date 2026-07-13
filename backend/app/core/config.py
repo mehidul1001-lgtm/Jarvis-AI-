@@ -79,6 +79,30 @@ class Settings(BaseSettings):
     # How far back the very first sync for a resource looks.
     amazon_initial_sync_lookback_days: int = 30
 
+    # --- Amazon credential bootstrap (optional) -----------------------------
+    # If set, connects/updates one Amazon account automatically on startup -
+    # env vars are the source of truth, the DB row is the runtime cache the
+    # rest of the app reads from. Names match scripts/validate_amazon_live.py
+    # exactly (no JARVIS_ prefix) so the same exported env vars work for both.
+    amazon_bootstrap_client_id: str = Field(default="", validation_alias="AMAZON_LWA_CLIENT_ID")
+    amazon_bootstrap_client_secret: str = Field(
+        default="", validation_alias="AMAZON_LWA_CLIENT_SECRET"
+    )
+    amazon_bootstrap_refresh_token: str = Field(
+        default="", validation_alias="AMAZON_LWA_REFRESH_TOKEN"
+    )
+    amazon_bootstrap_seller_id: str = Field(default="", validation_alias="AMAZON_SELLER_ID")
+    amazon_bootstrap_region: str = Field(default="NA", validation_alias="AMAZON_REGION")
+    amazon_bootstrap_marketplace_id: str = Field(
+        default="ATVPDKIKX0DER", validation_alias="AMAZON_MARKETPLACE_ID"
+    )
+    amazon_bootstrap_label: str = Field(
+        default="Primary Store", validation_alias="AMAZON_CREDENTIAL_LABEL"
+    )
+    amazon_bootstrap_user_email: str = Field(
+        default="", validation_alias="AMAZON_BOOTSTRAP_USER_EMAIL"
+    )
+
     # --- CORS ------------------------------------------------------------
     cors_origins: list[str] = Field(default=["http://localhost:5173", "http://localhost:3000"])
 

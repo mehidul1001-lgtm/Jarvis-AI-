@@ -24,12 +24,20 @@ logger = logging.getLogger("jarvis")
 async def lifespan(app: FastAPI):
     from app.agents.registry import get_agent_registry, register_workflow_handlers
     from app.ai.llm import get_llm_client
+    from app.integrations.amazon.bootstrap import bootstrap_credential_from_env
     from app.integrations.amazon.workflow import register_amazon_workflow_handlers
     from app.workflows.engine import get_workflow_engine
 
     settings = get_settings()
     configure_logging()
     db.init()
+
+    try:
+        async with db.sessionmaker() as session:
+            await bootstrap_credential_from_env(session, settings)
+            await session.commit()
+    except Exception:
+        logger.exception("Amazon credential bootstrap failed; continuing without it")
 
     get_agent_registry()  # load agents
     engine = get_workflow_engine()
