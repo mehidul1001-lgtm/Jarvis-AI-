@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import uuid
+from datetime import UTC, datetime, timedelta
 
 from app.agents.base import BaseAgent
 from app.ai.tools.registry import ToolContext, ToolRegistry
+from app.models.amazon import AmazonCredential
+from app.services.amazon_data_service import AmazonDataService
 
 
 class AmazonAgent(BaseAgent):
@@ -18,11 +22,167 @@ class AmazonAgent(BaseAgent):
         "keyword strategy and unit economics. Products and suppliers live in memory "
         "(kinds 'product' and 'supplier') — search them before answering. Use the "
         "calculation tools for fees and PPC math instead of estimating in your head. "
-        "Direct Amazon account integration (SP-API) is not connected yet; when live "
-        "account data is required, say so explicitly and work from stored data."
+        "If a Seller Central account is connected (check with amazon_list_accounts), "
+        "use amazon_sales_summary/amazon_inventory_status/amazon_recent_orders to "
+        "ground answers in real synced data instead of guessing; if none is "
+        "connected, say so explicitly and fall back to memory-stored figures."
     )
 
+    async def _resolve_credential(
+        self, ctx: ToolContext, credential_id: str | None
+    ) -> AmazonCredential | str:
+        """Returns the credential to use, or an error string for the model to relay."""
+        service = AmazonDataService(ctx.db)
+        if credential_id:
+            try:
+                return await service.get_credential(ctx.user, uuid.UUID(credential_id))
+            except (ValueError, LookupError):
+                return f"Error: no connected Amazon account with id '{credential_id}'."
+        accounts = await service.list_credentials(ctx.user)
+        if not accounts:
+            return "No Amazon Seller Central account is connected yet."
+        if len(accounts) > 1:
+            labels = ", ".join(f"{a.label} ({a.id})" for a in accounts)
+            return f"Multiple Amazon accounts are connected; specify credential_id: {labels}"
+        return accounts[0]
+
     def register_domain_tools(self, registry: ToolRegistry) -> None:
+        @registry.tool(
+            name="amazon_list_accounts",
+            description="List the Amazon Seller Central accounts connected to this business.",
+            input_schema={"type": "object", "properties": {}, "required": []},
+        )
+        async def amazon_list_accounts(ctx: ToolContext) -> str:
+            accounts = await AmazonDataService(ctx.db).list_credentials(ctx.user)
+            if not accounts:
+                return "No Amazon account is connected."
+            return json.dumps(
+                [
+                    {
+                        "id": str(a.id),
+                        "label": a.label,
+                        "region": a.region.value,
+                        "marketplace_id": a.marketplace_id,
+                        "is_active": a.is_active,
+                    }
+                    for a in accounts
+                ]
+            )
+
+        @registry.tool(
+            name="amazon_sales_summary",
+            description=(
+                "Real sales revenue/order-count/AOV for a connected Amazon account over the "
+                "last N days, from synced order data."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": ["number", "null"],
+                        "description": "Lookback window, default 30",
+                    },
+                    "credential_id": {
+                        "type": ["string", "null"],
+                        "description": "Which connected account, if more than one",
+                    },
+                },
+                "required": [],
+            },
+        )
+        async def amazon_sales_summary(
+            ctx: ToolContext, days: float | None = None, credential_id: str | None = None
+        ) -> str:
+            credential = await self._resolve_credential(ctx, credential_id)
+            if isinstance(credential, str):
+                return credential
+            end = datetime.now(UTC)
+            start = end - timedelta(days=int(days) if days else 30)
+            summary = await AmazonDataService(ctx.db).sales_summary(
+                ctx.user, credential.id, start=start, end=end
+            )
+            return json.dumps(summary, default=str)
+
+        @registry.tool(
+            name="amazon_inventory_status",
+            description=(
+                "Real FBA inventory levels (fulfillable/inbound/reserved quantities) per SKU "
+                "from the most recent sync, optionally filtered to low-stock SKUs."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "low_stock_only": {"type": ["boolean", "null"]},
+                    "credential_id": {"type": ["string", "null"]},
+                },
+                "required": [],
+            },
+        )
+        async def amazon_inventory_status(
+            ctx: ToolContext, low_stock_only: bool | None = None, credential_id: str | None = None
+        ) -> str:
+            credential = await self._resolve_credential(ctx, credential_id)
+            if isinstance(credential, str):
+                return credential
+            snapshots = await AmazonDataService(ctx.db).latest_inventory(
+                ctx.user, credential.id, low_stock_only=bool(low_stock_only)
+            )
+            if not snapshots:
+                return "No inventory data yet — run an Amazon sync first."
+            return json.dumps(
+                [
+                    {
+                        "seller_sku": s.seller_sku,
+                        "asin": s.asin,
+                        "fulfillable_quantity": s.fulfillable_quantity,
+                        "inbound_shipped_quantity": s.inbound_shipped_quantity,
+                        "reserved_quantity": s.reserved_quantity,
+                        "as_of": s.snapshot_at.isoformat(),
+                    }
+                    for s in snapshots[:50]
+                ]
+            )
+
+        @registry.tool(
+            name="amazon_recent_orders",
+            description="Most recent real Amazon orders from synced data.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": ["number", "null"], "description": "Default 10, max 50"},
+                    "credential_id": {"type": ["string", "null"]},
+                },
+                "required": [],
+            },
+        )
+        async def amazon_recent_orders(
+            ctx: ToolContext, limit: float | None = None, credential_id: str | None = None
+        ) -> str:
+            credential = await self._resolve_credential(ctx, credential_id)
+            if isinstance(credential, str):
+                return credential
+            page_size = min(int(limit) if limit else 10, 50)
+            orders, total = await AmazonDataService(ctx.db).list_orders(
+                ctx.user, credential.id, page=1, page_size=page_size
+            )
+            if not orders:
+                return "No orders synced yet — run an Amazon sync first."
+            return json.dumps(
+                {
+                    "total_in_range": total,
+                    "orders": [
+                        {
+                            "amazon_order_id": o.amazon_order_id,
+                            "purchase_date": o.purchase_date.isoformat(),
+                            "status": o.order_status,
+                            "total": str(o.order_total_amount) if o.order_total_amount else None,
+                            "currency": o.order_total_currency,
+                        }
+                        for o in orders
+                    ],
+                }
+            )
+
         @registry.tool(
             name="fba_profitability",
             description=(

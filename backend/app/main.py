@@ -24,6 +24,7 @@ logger = logging.getLogger("jarvis")
 async def lifespan(app: FastAPI):
     from app.agents.registry import get_agent_registry, register_workflow_handlers
     from app.ai.llm import get_llm_client
+    from app.integrations.amazon.workflow import register_amazon_workflow_handlers
     from app.workflows.engine import get_workflow_engine
 
     settings = get_settings()
@@ -33,6 +34,7 @@ async def lifespan(app: FastAPI):
     get_agent_registry()  # load agents
     engine = get_workflow_engine()
     register_workflow_handlers(engine)
+    register_amazon_workflow_handlers(engine)
     await engine.start()
 
     if not get_llm_client().available:

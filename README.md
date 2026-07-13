@@ -110,10 +110,27 @@ npm run build                     # strict TypeScript compile + production build
 - [Developer guide](docs/development.md)
 - [Administrator guide](docs/administration.md)
 
+## Amazon integration
+
+Phase 3a connects the Amazon agent to a real Seller Central account via the
+Selling Partner API (SP-API): orders, sales, FBA inventory, FBA inbound
+shipments and financial events sync on a recurring schedule and become
+queryable by the six agents and the REST API under `/api/v1/amazon/...`.
+
+Amazon's 2023 SP-API migration removed the AWS SigV4/IAM-role signing
+requirement — connecting a store only needs Login-with-Amazon (LWA)
+credentials, obtained from Seller Central → **Apps and Services → Develop
+apps**: an LWA client ID/secret and a refresh token authorized for your
+seller account. `POST /api/v1/amazon/credentials` (admin/manager only)
+stores them encrypted at rest with `JARVIS_ENCRYPTION_KEY`. Trigger a sync
+with `POST /api/v1/amazon/credentials/{id}/sync` (`recurring: true` keeps
+it running every `JARVIS_AMAZON_SYNC_INTERVAL_MINUTES`, default 30).
+
 ## Roadmap
 
 - **Phase 1 — Foundation** ✅ architecture, database, authentication, dashboard shell, core backend
-- **Phase 2 — AI brain**: Claude reasoning engine, long-term memory, chat, planning engine
-- **Phase 3 — Agents**: Amazon, Finance, Developer, Operations (+ Product Research, Marketing)
-- **Phase 4 — Automation**: browser automation, workflow engine, background jobs, notifications
-- **Phase 5 — Analytics & hardening**: reports, optimization, security review, deployment
+- **Phase 2 — AI brain** ✅ Claude reasoning engine, long-term memory, chat, planning engine, workflow engine, all six agents
+- **Phase 3a — Amazon SP-API integration** ✅ orders, sales, FBA inventory, FBA shipments, financial events
+- **Phase 3b — Amazon Ads API**: campaigns, keywords, search terms, ACOS/ROAS/CTR/CPC/spend
+- **Phase 3c — Enterprise dashboard**: live KPI cards, revenue charts, profit tracking, inventory heat map, PPC analytics
+- **Phase 3d — AI automation & voice**: PPC optimization, restock forecasting, listing quality, daily reports, voice assistant

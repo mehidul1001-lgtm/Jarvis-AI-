@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     workflow_default_max_retries: int = 2
     workflow_heartbeat_seconds: int = 30
 
+    # --- Amazon SP-API integration -------------------------------------------
+    # Each successful sync reschedules itself this many minutes later
+    # (the workflow engine has no native cron; self-rescheduling tasks
+    # give recurring sync without needing one).
+    amazon_sync_interval_minutes: int = 30
+    # How far back the very first sync for a resource looks.
+    amazon_initial_sync_lookback_days: int = 30
+
     # --- CORS ------------------------------------------------------------
     cors_origins: list[str] = Field(default=["http://localhost:5173", "http://localhost:3000"])
 

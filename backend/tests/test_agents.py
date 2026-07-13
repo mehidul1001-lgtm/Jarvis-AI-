@@ -43,6 +43,9 @@ def test_domain_tools_are_agent_specific():
     assert "fba_profitability" in amazon_tools
     assert "fba_profitability" not in finance_tools
     assert "cashflow_projection" in finance_tools
+    assert "amazon_sales_summary" in amazon_tools
+    assert "amazon_inventory_status" in amazon_tools
+    assert "amazon_sales_summary" not in finance_tools
 
 
 async def test_agent_run_via_workflow_engine(client, admin_tokens, fake_llm):
@@ -133,6 +136,66 @@ async def test_amazon_fee_math_is_correct(client, admin_tokens):
         assert data["referral_fee"] == 3.75
         assert data["net_profit_per_unit"] == 11.75
         assert data["margin_pct"] == 47.0
+
+
+async def test_amazon_sales_summary_tool_reflects_real_synced_data(client, admin_tokens):
+    """The amazon agent's data tools must read real synced rows, not guess -
+    this is what makes it a live business integration rather than Phase 2's
+    memory-only agent."""
+    from datetime import UTC, datetime
+
+    from app.ai.tools.registry import ToolContext
+    from app.core.security import encrypt_value
+    from app.models.amazon import AmazonCredential, AmazonOrder, AmazonRegion
+
+    async with db.sessionmaker() as session:
+        user = (
+            await session.execute(select(User).where(User.email == "admin@example.com"))
+        ).scalar_one()
+
+        assert (
+            await get_agent_registry()
+            .get("amazon")
+            .tools.execute(
+                "amazon_sales_summary", {}, ToolContext(db=session, user=user, agent="amazon")
+            )
+        ).content == "No Amazon Seller Central account is connected yet."
+
+        credential = AmazonCredential(
+            user_id=user.id,
+            label="Test Store",
+            region=AmazonRegion.NA,
+            marketplace_id="ATVPDKIKX0DER",
+            seller_id="A1B2C3D4E5",
+            lwa_client_id="fake-client-id",
+            lwa_client_secret_encrypted=encrypt_value("fake-secret"),
+            lwa_refresh_token_encrypted=encrypt_value("fake-refresh"),
+        )
+        session.add(credential)
+        await session.flush()
+        session.add(
+            AmazonOrder(
+                credential_id=credential.id,
+                amazon_order_id="999-0000000-0000001",
+                purchase_date=datetime.now(UTC),
+                last_update_date=datetime.now(UTC),
+                order_status="Shipped",
+                marketplace_id="ATVPDKIKX0DER",
+                order_total_amount="88.00",
+                order_total_currency="USD",
+            )
+        )
+        await session.commit()
+
+        ctx = ToolContext(db=session, user=user, agent="amazon")
+        result = (
+            await get_agent_registry()
+            .get("amazon")
+            .tools.execute("amazon_sales_summary", {"days": 30}, ctx)
+        )
+        data = json.loads(result.content)
+        assert data["order_count"] == 1
+        assert data["total_revenue"] == "88.00"
 
 
 async def test_tool_role_permissions_enforced(client, admin_tokens, user_tokens):

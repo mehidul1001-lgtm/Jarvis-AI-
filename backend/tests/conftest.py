@@ -46,7 +46,10 @@ def _clean_tables(_create_schema):
         conn.execute(
             text(
                 "TRUNCATE TABLE audit_logs, user_sessions, users, conversations, "
-                "messages, memory_entries, workflow_tasks CASCADE"
+                "messages, memory_entries, workflow_tasks, amazon_credentials, "
+                "amazon_sync_states, amazon_orders, amazon_order_items, "
+                "amazon_inventory_snapshots, amazon_fba_shipments, "
+                "amazon_financial_events CASCADE"
             )
         )
     engine.dispose()
@@ -68,9 +71,12 @@ def fake_llm():
 def _register_workflow_handlers(_create_schema):
     """API tests need the standard handlers even without the app lifespan."""
     from app.agents.registry import register_workflow_handlers
+    from app.integrations.amazon.workflow import register_amazon_workflow_handlers
     from app.workflows.engine import get_workflow_engine
 
-    register_workflow_handlers(get_workflow_engine())
+    engine = get_workflow_engine()
+    register_workflow_handlers(engine)
+    register_amazon_workflow_handlers(engine)
 
 
 @pytest.fixture
