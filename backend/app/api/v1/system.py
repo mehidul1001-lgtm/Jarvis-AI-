@@ -1,4 +1,5 @@
 """System endpoints: health check and the realtime WebSocket channel."""
+
 from __future__ import annotations
 
 import logging
@@ -11,6 +12,7 @@ from app import __version__
 from app.core.config import get_settings
 from app.core.database import db
 from app.core.exceptions import AuthenticationError
+from app.core.realtime import manager
 from app.core.security import decode_access_token
 from app.models.session import UserSession
 from app.models.user import User
@@ -39,38 +41,6 @@ async def health() -> HealthStatus:
     )
 
 
-class ConnectionManager:
-    """Tracks authenticated WebSocket connections per user.
-
-    Phase 2+ pushes chat streams and notifications through this manager;
-    in Phase 1 it powers the realtime system channel (ping/echo).
-    """
-
-    def __init__(self) -> None:
-        self.connections: dict[uuid.UUID, list[WebSocket]] = {}
-
-    async def connect(self, user_id: uuid.UUID, websocket: WebSocket) -> None:
-        await websocket.accept()
-        self.connections.setdefault(user_id, []).append(websocket)
-
-    def disconnect(self, user_id: uuid.UUID, websocket: WebSocket) -> None:
-        sockets = self.connections.get(user_id, [])
-        if websocket in sockets:
-            sockets.remove(websocket)
-        if not sockets:
-            self.connections.pop(user_id, None)
-
-    async def send_to_user(self, user_id: uuid.UUID, payload: dict) -> None:
-        for websocket in list(self.connections.get(user_id, [])):
-            try:
-                await websocket.send_json(payload)
-            except Exception:
-                self.disconnect(user_id, websocket)
-
-
-manager = ConnectionManager()
-
-
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: str = "") -> None:
     """Authenticated realtime channel.
@@ -89,12 +59,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = "") -> None:
     async with db.sessionmaker() as session:
         user_session = await session.get(UserSession, session_id)
         user = await session.get(User, user_id)
-        if (
-            user_session is None
-            or not user_session.is_active
-            or user is None
-            or not user.is_active
-        ):
+        if user_session is None or not user_session.is_active or user is None or not user.is_active:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 

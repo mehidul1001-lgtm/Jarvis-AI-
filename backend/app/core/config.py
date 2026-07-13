@@ -5,6 +5,7 @@ All settings are read from environment variables (prefix ``JARVIS_``) or a
 the application refuses to boot in production without them being set
 explicitly.
 """
+
 from __future__ import annotations
 
 import secrets
@@ -47,16 +48,37 @@ class Settings(BaseSettings):
     password_min_length: int = 10
     max_sessions_per_user: int = 10
 
+    # --- AI brain ----------------------------------------------------------
+    anthropic_api_key: str = Field(default="")
+    ai_model: str = "claude-opus-4-8"
+    # Model for internal utility passes (summarization, reflection). Defaults
+    # to the main model; may be overridden for cost.
+    ai_utility_model: str = "claude-opus-4-8"
+    ai_max_output_tokens: int = 8192
+    ai_effort: Literal["low", "medium", "high", "max"] = "high"
+    ai_max_tool_iterations: int = 12
+    ai_reflection_enabled: bool = True
+    # Context budgets (approximate tokens) for prompt assembly.
+    ai_context_token_budget: int = 24000
+    ai_history_token_budget: int = 12000
+    ai_memory_token_budget: int = 4000
+    # Summarize (compress) conversation history once it exceeds this many messages.
+    ai_compress_after_messages: int = 30
+
+    # --- Workflow engine ---------------------------------------------------
+    workflow_max_parallel: int = 4
+    workflow_poll_interval_seconds: float = 1.0
+    workflow_default_max_retries: int = 2
+    workflow_heartbeat_seconds: int = 30
+
     # --- CORS ------------------------------------------------------------
-    cors_origins: list[str] = Field(
-        default=["http://localhost:5173", "http://localhost:3000"]
-    )
+    cors_origins: list[str] = Field(default=["http://localhost:5173", "http://localhost:3000"])
 
     # --- Rate limiting ---------------------------------------------------
     rate_limit_enabled: bool = True
-    rate_limit_requests: int = 120           # general requests per window
+    rate_limit_requests: int = 120  # general requests per window
     rate_limit_window_seconds: int = 60
-    rate_limit_auth_requests: int = 10       # stricter budget for auth endpoints
+    rate_limit_auth_requests: int = 10  # stricter budget for auth endpoints
     rate_limit_auth_window_seconds: int = 60
 
     # --- Logging ---------------------------------------------------------

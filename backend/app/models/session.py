@@ -4,6 +4,7 @@ Only a SHA-256 digest of the refresh token is persisted. Tokens are rotated
 on every refresh; a session is revoked on logout or when rotation detects
 reuse of an already-rotated token.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -33,9 +34,7 @@ class UserSession(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         String(64), unique=True, index=True, nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
 

@@ -1,4 +1,5 @@
 """Admin user management endpoints."""
+
 from __future__ import annotations
 
 import uuid

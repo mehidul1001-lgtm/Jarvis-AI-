@@ -1,4 +1,5 @@
 """Alembic migration environment (sync driver, URL from app settings)."""
+
 from __future__ import annotations
 
 from logging.config import fileConfig

@@ -1,4 +1,5 @@
 """Application exception hierarchy and FastAPI handlers."""
+
 from __future__ import annotations
 
 import logging

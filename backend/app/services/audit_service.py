@@ -1,4 +1,5 @@
 """Audit trail writing and querying."""
+
 from __future__ import annotations
 
 import uuid
@@ -50,9 +51,7 @@ class AuditService:
             query = query.where(AuditLog.user_id == user_id)
 
         total = (
-            await self.db.execute(
-                select(func.count()).select_from(query.subquery())
-            )
+            await self.db.execute(select(func.count()).select_from(query.subquery()))
         ).scalar_one()
         result = await self.db.execute(
             query.order_by(AuditLog.created_at.desc())

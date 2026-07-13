@@ -1,4 +1,5 @@
 """Unit tests for security primitives and the rate limiter."""
+
 from __future__ import annotations
 
 import uuid

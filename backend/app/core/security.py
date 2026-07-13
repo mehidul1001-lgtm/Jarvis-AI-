@@ -1,4 +1,5 @@
 """Password hashing, JWT handling and symmetric encryption utilities."""
+
 from __future__ import annotations
 
 import hashlib
@@ -20,10 +21,9 @@ REFRESH_TOKEN_TYPE = "refresh"  # noqa: S105
 
 # --- Passwords -----------------------------------------------------------
 
+
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode(
-        "utf-8"
-    )
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str) -> bool:
@@ -34,6 +34,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 # --- Refresh tokens ------------------------------------------------------
+
 
 def generate_refresh_token() -> str:
     """Opaque, URL-safe random token handed to the client."""
@@ -47,6 +48,7 @@ def hash_refresh_token(token: str) -> str:
 
 # --- JWT access tokens ---------------------------------------------------
 
+
 def create_access_token(
     user_id: uuid.UUID,
     role: str,
@@ -55,9 +57,7 @@ def create_access_token(
 ) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
-    expire = now + (
-        expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
-    )
+    expire = now + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
     payload: dict[str, Any] = {
         "sub": str(user_id),
         "role": role,
@@ -89,6 +89,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
 
 
 # --- Symmetric encryption for sensitive data at rest ----------------------
+
 
 def encrypt_value(plaintext: str) -> str:
     fernet = Fernet(get_settings().encryption_key.encode("utf-8"))

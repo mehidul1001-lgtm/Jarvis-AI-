@@ -4,6 +4,7 @@ Suitable for a single-instance deployment; the interface is deliberately
 narrow so a Redis-backed implementation can replace :class:`SlidingWindowLimiter`
 without touching the middleware when the platform scales horizontally.
 """
+
 from __future__ import annotations
 
 import threading
@@ -71,18 +72,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             settings.rate_limit_auth_requests, settings.rate_limit_auth_window_seconds
         )
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if not self.enabled:
             return await call_next(request)
 
         client_ip = request.client.host if request.client else "unknown"
-        limiter = (
-            self.auth
-            if request.url.path.startswith(self.AUTH_PREFIXES)
-            else self.general
-        )
+        limiter = self.auth if request.url.path.startswith(self.AUTH_PREFIXES) else self.general
         allowed, retry_after = limiter.allow(client_ip)
         if not allowed:
             return JSONResponse(

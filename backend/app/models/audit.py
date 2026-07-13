@@ -1,4 +1,5 @@
 """Immutable audit trail of security-relevant events."""
+
 from __future__ import annotations
 
 import uuid
@@ -15,9 +16,7 @@ class AuditLog(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "audit_logs"
 
     # No FK: audit entries must survive user deletion.
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), index=True, nullable=True
-    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True, nullable=True)
     action: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
     resource: Mapped[str | None] = mapped_column(String(200), nullable=True)
     detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

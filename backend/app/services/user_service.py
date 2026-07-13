@@ -1,4 +1,5 @@
 """User management (self-service and admin)."""
+
 from __future__ import annotations
 
 import uuid
@@ -32,9 +33,7 @@ class UserService:
         return user
 
     async def list(self, *, page: int = 1, page_size: int = 20) -> tuple[list[User], int]:
-        total = (
-            await self.db.execute(select(func.count()).select_from(User))
-        ).scalar_one()
+        total = (await self.db.execute(select(func.count()).select_from(User))).scalar_one()
         result = await self.db.execute(
             select(User)
             .order_by(User.created_at.asc())

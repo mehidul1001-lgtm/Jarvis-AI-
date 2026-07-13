@@ -1,4 +1,5 @@
 """Authentication flow tests: register, login, refresh rotation, logout, RBAC."""
+
 from __future__ import annotations
 
 from httpx import AsyncClient
@@ -65,9 +66,7 @@ async def test_me_requires_token(client: AsyncClient):
     resp = await client.get("/api/v1/auth/me")
     assert resp.status_code == 401
 
-    resp = await client.get(
-        "/api/v1/auth/me", headers={"Authorization": "Bearer not-a-token"}
-    )
+    resp = await client.get("/api/v1/auth/me", headers={"Authorization": "Bearer not-a-token"})
     assert resp.status_code == 401
 
 
@@ -136,9 +135,7 @@ async def test_password_change_revokes_sessions(client: AsyncClient, admin_token
 
 
 async def test_session_listing_and_revocation(client: AsyncClient, admin_tokens: dict):
-    resp = await client.get(
-        "/api/v1/auth/me/sessions", headers=auth_header(admin_tokens)
-    )
+    resp = await client.get("/api/v1/auth/me/sessions", headers=auth_header(admin_tokens))
     assert resp.status_code == 200
     sessions = resp.json()
     assert len(sessions) == 1

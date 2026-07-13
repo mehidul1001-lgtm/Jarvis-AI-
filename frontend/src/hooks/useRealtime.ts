@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { websocketUrl } from '../api/client';
+import type { RealtimeEvent } from '../types';
+import { realtimeBus } from './realtimeBus';
 
 export type RealtimeStatus = 'connecting' | 'connected' | 'disconnected';
 
@@ -36,6 +38,15 @@ export function useRealtime(enabled: boolean): RealtimeStatus {
             socket.send(JSON.stringify({ type: 'ping' }));
           }
         }, 30_000);
+      };
+
+      socket.onmessage = (message: MessageEvent<string>) => {
+        try {
+          const event = JSON.parse(message.data) as RealtimeEvent;
+          if (event.type && event.type !== 'pong') realtimeBus.publish(event);
+        } catch {
+          // Ignore malformed frames.
+        }
       };
 
       socket.onclose = () => {

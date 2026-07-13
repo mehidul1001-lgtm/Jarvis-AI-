@@ -25,16 +25,6 @@ function ComingSoon({
   );
 }
 
-export function ChatPage() {
-  return (
-    <ComingSoon
-      title="AI Chat"
-      phase="Phase 2"
-      description="Conversational interface to the JARVIS AI brain with task planning, tool use, long-term memory retrieval and multi-step reasoning."
-    />
-  );
-}
-
 export function AgentsPage() {
   return (
     <ComingSoon
@@ -51,16 +41,6 @@ export function AnalyticsPage() {
       title="Analytics"
       phase="Phase 5"
       description="Sales, expenses, profit, inventory and performance analytics across your whole business."
-    />
-  );
-}
-
-export function MemoryPage() {
-  return (
-    <ComingSoon
-      title="Memory Explorer"
-      phase="Phase 2"
-      description="Browse and manage what JARVIS remembers: conversations, preferences, products, suppliers, workflows, business rules and documents."
     />
   );
 }

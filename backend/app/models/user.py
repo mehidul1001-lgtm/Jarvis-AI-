@@ -1,4 +1,5 @@
 """User account model with role-based access control."""
+
 from __future__ import annotations
 
 import enum
@@ -23,9 +24,7 @@ class UserRole(str, enum.Enum):
 class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "users"
 
-    email: Mapped[str] = mapped_column(
-        String(320), unique=True, index=True, nullable=False
-    )
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     role: Mapped[UserRole] = mapped_column(
@@ -34,9 +33,7 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    last_login_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     sessions: Mapped[list[UserSession]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

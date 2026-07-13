@@ -1,4 +1,5 @@
 """Request ID propagation, timing, request logging and security headers."""
+
 from __future__ import annotations
 
 import logging
@@ -21,9 +22,7 @@ SECURITY_HEADERS = {
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
         request.state.request_id = request_id
         start = time.perf_counter()

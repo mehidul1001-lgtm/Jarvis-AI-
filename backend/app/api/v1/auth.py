@@ -1,4 +1,5 @@
 """Authentication endpoints."""
+
 from __future__ import annotations
 
 import uuid
@@ -82,9 +83,7 @@ async def my_sessions(user: CurrentUser, db: DbSession) -> list[SessionOut]:
 
 
 @router.delete("/me/sessions/{session_id}", response_model=Message)
-async def revoke_session(
-    session_id: uuid.UUID, user: CurrentUser, db: DbSession
-) -> Message:
+async def revoke_session(session_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Message:
     revoked = await AuthService(db).revoke_session(user, session_id)
     if not revoked:
         return Message(message="Session not found")

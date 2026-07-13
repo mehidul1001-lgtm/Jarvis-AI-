@@ -1,4 +1,5 @@
 """JARVIS AI backend application entrypoint."""
+
 from __future__ import annotations
 
 import logging
@@ -21,15 +22,31 @@ logger = logging.getLogger("jarvis")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.agents.registry import get_agent_registry, register_workflow_handlers
+    from app.ai.llm import get_llm_client
+    from app.workflows.engine import get_workflow_engine
+
     settings = get_settings()
     configure_logging()
     db.init()
+
+    get_agent_registry()  # load agents
+    engine = get_workflow_engine()
+    register_workflow_handlers(engine)
+    await engine.start()
+
+    if not get_llm_client().available:
+        logger.warning(
+            "JARVIS_ANTHROPIC_API_KEY is not set — AI chat and agents are disabled "
+            "until it is configured"
+        )
     logger.info(
         "JARVIS AI backend %s starting (environment=%s)",
         __version__,
         settings.environment,
     )
     yield
+    await engine.stop()
     await db.dispose()
     logger.info("JARVIS AI backend stopped")
 

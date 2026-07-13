@@ -2,15 +2,12 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { Spinner } from './components/ui';
 import { useAuth } from './context/AuthContext';
+import { ChatPage } from './pages/ChatPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { LogsPage } from './pages/LogsPage';
-import {
-  AgentsPage,
-  AnalyticsPage,
-  ChatPage,
-  MemoryPage,
-} from './pages/PlaceholderPages';
+import { MemoryPage } from './pages/MemoryPage';
+import { AgentsPage, AnalyticsPage } from './pages/PlaceholderPages';
 import { RegisterPage } from './pages/RegisterPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { UsersPage } from './pages/UsersPage';

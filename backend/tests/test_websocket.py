@@ -1,4 +1,5 @@
 """WebSocket channel tests (runs the app through its full lifespan)."""
+
 from __future__ import annotations
 
 import pytest

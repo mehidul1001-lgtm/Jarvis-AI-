@@ -1,4 +1,5 @@
 """Shared pytest fixtures: isolated test database + ASGI test client."""
+
 from __future__ import annotations
 
 import os
@@ -11,6 +12,10 @@ TEST_DATABASE_URL = os.environ.setdefault(
 )
 os.environ.setdefault("JARVIS_ENVIRONMENT", "test")
 os.environ.setdefault("JARVIS_RATE_LIMIT_ENABLED", "false")
+# Deterministic AI behavior in tests: no reflection pass unless a test
+# explicitly opts in on its Brain instance; fast workflow scheduler.
+os.environ.setdefault("JARVIS_AI_REFLECTION_ENABLED", "false")
+os.environ.setdefault("JARVIS_WORKFLOW_POLL_INTERVAL_SECONDS", "0.05")
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -38,8 +43,34 @@ def _clean_tables(_create_schema):
     yield
     engine = create_engine(SYNC_URL)
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE audit_logs, user_sessions, users CASCADE"))
+        conn.execute(
+            text(
+                "TRUNCATE TABLE audit_logs, user_sessions, users, conversations, "
+                "messages, memory_entries, workflow_tasks CASCADE"
+            )
+        )
     engine.dispose()
+
+
+@pytest.fixture
+def fake_llm():
+    """Install a scriptable LLM client; restored after the test."""
+    from app.ai.llm import set_llm_client
+    from tests.fake_llm import FakeLLMClient
+
+    client = FakeLLMClient()
+    set_llm_client(client)
+    yield client
+    set_llm_client(None)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _register_workflow_handlers(_create_schema):
+    """API tests need the standard handlers even without the app lifespan."""
+    from app.agents.registry import register_workflow_handlers
+    from app.workflows.engine import get_workflow_engine
+
+    register_workflow_handlers(get_workflow_engine())
 
 
 @pytest.fixture

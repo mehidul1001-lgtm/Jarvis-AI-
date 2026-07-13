@@ -1,4 +1,5 @@
 """Shared FastAPI dependencies: current user resolution and RBAC guards."""
+
 from __future__ import annotations
 
 import uuid
@@ -21,9 +22,7 @@ DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 
 async def get_current_user(
     db: DbSession,
-    credentials: Annotated[
-        HTTPAuthorizationCredentials | None, Depends(bearer_scheme)
-    ] = None,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)] = None,
 ) -> User:
     if credentials is None:
         raise AuthenticationError("Missing authentication credentials")

@@ -1,4 +1,5 @@
 """Health endpoint and platform hardening checks."""
+
 from __future__ import annotations
 
 from httpx import AsyncClient

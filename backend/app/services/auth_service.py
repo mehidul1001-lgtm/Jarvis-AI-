@@ -1,4 +1,5 @@
 """Registration, login, token refresh with rotation, and logout."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -43,9 +44,7 @@ class AuthService:
             raise ConflictError("An account with this email already exists")
 
         # Bootstrap: the very first account becomes the administrator.
-        user_count = (
-            await self.db.execute(select(func.count()).select_from(User))
-        ).scalar_one()
+        user_count = (await self.db.execute(select(func.count()).select_from(User))).scalar_one()
         role = UserRole.ADMIN if user_count == 0 else UserRole.USER
 
         user = User(
@@ -63,9 +62,7 @@ class AuthService:
 
     # --- Login ------------------------------------------------------------
 
-    async def login(
-        self, email: str, password: str, request: Request | None = None
-    ) -> TokenPair:
+    async def login(self, email: str, password: str, request: Request | None = None) -> TokenPair:
         email = email.lower().strip()
         result = await self.db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
@@ -74,17 +71,13 @@ class AuthService:
         # require a dummy hash; instead we keep error messages identical so
         # the response does not reveal whether the account exists.
         if user is None or not verify_password(password, user.password_hash):
-            await self.audit.record(
-                "auth.login_failed", detail={"email": email}, request=request
-            )
+            await self.audit.record("auth.login_failed", detail={"email": email}, request=request)
             # Commit before raising: the request-scoped session rolls back on
             # exceptions, which would silently drop this audit entry.
             await self.db.commit()
             raise AuthenticationError("Invalid email or password")
         if not user.is_active:
-            await self.audit.record(
-                "auth.login_blocked", user_id=user.id, request=request
-            )
+            await self.audit.record("auth.login_blocked", user_id=user.id, request=request)
             await self.db.commit()
             raise AuthenticationError("This account has been deactivated")
 
@@ -139,9 +132,7 @@ class AuthService:
         session = result.scalar_one_or_none()
         if session is not None and session.revoked_at is None:
             session.revoked_at = datetime.now(UTC)
-            await self.audit.record(
-                "auth.logout", user_id=session.user_id, request=request
-            )
+            await self.audit.record("auth.logout", user_id=session.user_id, request=request)
 
     async def revoke_session(self, user: User, session_id) -> bool:
         """Revoke one of the user's own sessions (device management)."""
@@ -164,8 +155,7 @@ class AuthService:
         session = UserSession(
             user_id=user.id,
             refresh_token_hash=hash_refresh_token(refresh_token),
-            expires_at=datetime.now(UTC)
-            + timedelta(days=self.settings.refresh_token_expire_days),
+            expires_at=datetime.now(UTC) + timedelta(days=self.settings.refresh_token_expire_days),
             user_agent=(request.headers.get("user-agent") if request else None),
             ip_address=(request.client.host if request and request.client else None),
         )
@@ -192,7 +182,7 @@ class AuthService:
         )
         active = list(result.scalars().all())
         overflow = len(active) - self.settings.max_sessions_per_user + 1
-        for session in active[:max(overflow, 0)]:
+        for session in active[: max(overflow, 0)]:
             session.revoked_at = datetime.now(UTC)
 
     async def _revoke_all_sessions(self, user_id) -> None:
