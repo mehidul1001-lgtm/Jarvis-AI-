@@ -110,6 +110,7 @@ npm run build                     # strict TypeScript compile + production build
 - [Developer guide](docs/development.md)
 - [Administrator guide](docs/administration.md)
 - [Validating the Amazon integration against a real account](docs/amazon-validation.md)
+- [Implementation roadmap](docs/roadmap.md)
 
 ## Amazon integration
 
