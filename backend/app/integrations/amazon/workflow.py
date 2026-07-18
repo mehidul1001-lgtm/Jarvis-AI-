@@ -24,6 +24,7 @@ logger = logging.getLogger("jarvis.integrations.amazon.workflow")
 
 RESOURCE_HANDLERS = {
     "orders": "sync_orders",
+    "listings": "sync_listings",
     "inventory": "sync_inventory",
     "fba_shipments": "sync_fba_shipments",
     "financial_events": "sync_financial_events",

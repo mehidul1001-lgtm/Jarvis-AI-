@@ -47,6 +47,8 @@ class AmazonAPI(Protocol):
 
     async def list_order_items(self, amazon_order_id: str) -> list[dict[str, Any]]: ...
 
+    async def search_listings_items(self, *, next_token: str | None = None) -> AmazonPage: ...
+
     async def list_inventory_summaries(self, *, next_token: str | None = None) -> AmazonPage: ...
 
     async def list_inbound_shipments(self, *, next_token: str | None = None) -> AmazonPage: ...
@@ -71,12 +73,16 @@ class SPAPIClient:
         lwa_client_id: str,
         lwa_client_secret: str,
         lwa_refresh_token: str,
+        # Only the Listings API embeds the seller id in its URL path;
+        # optional so auth/marketplace diagnostics work without it.
+        seller_id: str | None = None,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         if region not in REGION_ENDPOINTS:
             raise SPAPIError(f"Unknown SP-API region '{region}'")
         self.base_url = REGION_ENDPOINTS[region]
         self.marketplace_id = marketplace_id
+        self.seller_id = seller_id
         self._owns_http = http_client is None
         self._http = http_client or httpx.AsyncClient(timeout=30.0)
         self._token = LWATokenProvider(
@@ -253,6 +259,32 @@ class SPAPIClient:
             items.extend(raw.get("OrderItems", []))
             next_token = raw.get("NextToken")
         return items
+
+    # --- Listings Items 2021-08-01 ----------------------------------------------
+
+    async def search_listings_items(self, *, next_token: str | None = None) -> AmazonPage:
+        """All of the seller's listings in this marketplace, one page at a time.
+
+        Unlike the v0 endpoints this API is not payload-wrapped and pages via
+        ``pageToken``; its maximum page size is 20.
+        """
+        if not self.seller_id:
+            raise SPAPIError("seller_id is required for the Listings API")
+        params: dict[str, Any] = {
+            "marketplaceIds": self.marketplace_id,
+            "includedData": "summaries",
+            "pageSize": 20,
+        }
+        if next_token:
+            params["pageToken"] = next_token
+        raw = await self._request(
+            "listings.search",
+            "GET",
+            f"/listings/2021-08-01/items/{self.seller_id}",
+            params=params,
+        )
+        pagination = raw.get("pagination") or {}
+        return AmazonPage(items=raw.get("items", []), next_token=pagination.get("nextToken"))
 
     # --- FBA Inventory v1 ------------------------------------------------------
 

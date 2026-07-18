@@ -20,6 +20,7 @@ from app.models.amazon import (
     AmazonCredential,
     AmazonFinancialEvent,
     AmazonInventorySnapshot,
+    AmazonListing,
     AmazonOrder,
 )
 from app.models.task import TaskStatus, WorkflowTask
@@ -144,6 +145,15 @@ async def seeded_credential(client: AsyncClient, admin_tokens) -> str:
             )
         )
         session.add(
+            AmazonListing(
+                credential_id=cred_uuid,
+                seller_sku="SKU-LOW",
+                asin="B000000002",
+                item_name="Bamboo Cutting Board",
+                status=["BUYABLE"],
+            )
+        )
+        session.add(
             AmazonFinancialEvent(
                 credential_id=cred_uuid,
                 event_type="ShipmentEvent",
@@ -183,6 +193,21 @@ async def test_sales_summary_reflects_order_total(
     body = resp.json()
     assert body["order_count"] == 1
     assert body["total_revenue"] == "49.99"
+
+
+async def test_listings_endpoint_returns_seeded_listing(
+    client: AsyncClient, admin_tokens, seeded_credential
+):
+    resp = await client.get(
+        f"/api/v1/amazon/credentials/{seeded_credential}/listings",
+        headers=auth_header(admin_tokens),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["items"][0]["seller_sku"] == "SKU-LOW"
+    assert body["items"][0]["status"] == ["BUYABLE"]
+    assert body["items"][0]["item_name"] == "Bamboo Cutting Board"
 
 
 async def test_inventory_low_stock_filter(client: AsyncClient, admin_tokens, seeded_credential):

@@ -22,6 +22,7 @@ from app.models.amazon import (
     AmazonFbaShipment,
     AmazonFinancialEvent,
     AmazonInventorySnapshot,
+    AmazonListing,
     AmazonOrder,
     AmazonSyncState,
 )
@@ -147,6 +148,26 @@ class AmazonDataService:
             "currency": currency,
             "average_order_value": avg,
         }
+
+    # --- Listings ------------------------------------------------------------------
+
+    async def list_listings(
+        self,
+        user: User,
+        credential_id: uuid.UUID,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[AmazonListing], int]:
+        await self.get_credential(user, credential_id)
+        query = select(AmazonListing).where(AmazonListing.credential_id == credential_id)
+        total = (
+            await self.db.execute(select(func.count()).select_from(query.subquery()))
+        ).scalar_one()
+        result = await self.db.execute(
+            query.order_by(AmazonListing.seller_sku).offset((page - 1) * page_size).limit(page_size)
+        )
+        return list(result.scalars().all()), total
 
     # --- Inventory ------------------------------------------------------------------
 

@@ -31,7 +31,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -203,6 +203,36 @@ class AmazonFbaShipment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("credential_id", "shipment_id", name="uq_amazon_fba_shipment"),
     )
+
+
+class AmazonListing(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """One marketplace listing (SKU) from the Listings Items API.
+
+    Upserted on every sync; a listing removed on Amazon keeps its last-seen
+    row here (its ``status`` reflects the final state Amazon reported).
+    """
+
+    __tablename__ = "amazon_listings"
+
+    credential_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("amazon_credentials.id", ondelete="CASCADE"), nullable=False
+    )
+    seller_sku: Mapped[str] = mapped_column(String(100), nullable=False)
+    asin: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    product_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    item_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    condition_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Amazon reports zero or more states, e.g. ["BUYABLE", "DISCOVERABLE"].
+    status: Mapped[list[str] | None] = mapped_column(ARRAY(String(30)), nullable=True)
+    main_image_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    listing_created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    listing_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (UniqueConstraint("credential_id", "seller_sku", name="uq_amazon_listing"),)
 
 
 class AmazonFinancialEvent(Base, UUIDPrimaryKeyMixin):

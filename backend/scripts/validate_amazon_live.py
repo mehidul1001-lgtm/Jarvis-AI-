@@ -223,7 +223,10 @@ async def main() -> int:
             print(f"\nCreated credential '{label}' ({credential.id}) for {user.email}")
 
         print("\n" + "=" * 78)
-        print("3-6. Running the real sync pipeline (orders, inventory, FBA shipments, financials)")
+        print(
+            "3-6. Running the real sync pipeline "
+            "(orders, listings, inventory, FBA shipments, financials)"
+        )
         print("=" * 78)
         try:
             async with AmazonSyncService(session, credential) as service:
@@ -260,6 +263,17 @@ async def main() -> int:
                     f"  {o.amazon_order_id}  {o.purchase_date}  {o.order_status}  "
                     f"{o.order_total_amount} {o.order_total_currency}"
                 )
+
+            listings, listing_total = await data.list_listings(
+                user, credential.id, page=1, page_size=10
+            )
+            print(
+                f"\nListings - compare to Manage All Inventory "
+                f"(showing up to 10 of {listing_total}):"
+            )
+            for li in listings:
+                statuses = ",".join(li.status or [])
+                print(f"  {li.seller_sku:20s} {li.asin or '-':12s} [{statuses}] {li.item_name}")
 
             inventory = await data.latest_inventory(user, credential.id)
             print(f"\nFBA inventory - compare to Manage FBA Inventory ({len(inventory)} SKU(s)):")

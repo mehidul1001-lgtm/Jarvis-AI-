@@ -49,7 +49,7 @@ def _clean_tables(_create_schema):
                 "messages, memory_entries, workflow_tasks, amazon_credentials, "
                 "amazon_sync_states, amazon_orders, amazon_order_items, "
                 "amazon_inventory_snapshots, amazon_fba_shipments, "
-                "amazon_financial_events CASCADE"
+                "amazon_financial_events, amazon_listings CASCADE"
             )
         )
     engine.dispose()

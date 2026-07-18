@@ -29,6 +29,7 @@ from app.models.amazon import (
     AmazonFbaShipment,
     AmazonFinancialEvent,
     AmazonInventorySnapshot,
+    AmazonListing,
     AmazonOrder,
     AmazonOrderItem,
     AmazonSyncState,
@@ -107,6 +108,7 @@ def build_credential_client(credential: AmazonCredential) -> SPAPIClient:
         lwa_client_id=credential.lwa_client_id,
         lwa_client_secret=decrypt_value(credential.lwa_client_secret_encrypted),
         lwa_refresh_token=decrypt_value(credential.lwa_refresh_token_encrypted),
+        seller_id=credential.seller_id,
     )
 
 
@@ -277,6 +279,89 @@ class AmazonSyncService:
             }
             stmt = stmt.on_conflict_do_update(constraint="uq_amazon_order_item", set_=update_cols)
             await self.db.execute(stmt)
+
+    # --- Listings -----------------------------------------------------------------
+
+    async def sync_listings(self) -> SyncResult:
+        state = await self._get_or_create_state("listings")
+        state.status = SyncStatus.RUNNING
+        await self.db.flush()
+
+        result = SyncResult(resource="listings")
+        next_token = state.next_token
+        logger.info(
+            "Amazon sync 'listings' started (credential=%s '%s')",
+            self.credential.id,
+            self.credential.label,
+        )
+        try:
+            for page_num in range(1, MAX_PAGES_PER_SYNC + 1):
+                page = await self.client.search_listings_items(next_token=next_token)
+                logger.info(
+                    "Amazon sync 'listings' page %s: %s listing(s) (credential=%s)",
+                    page_num,
+                    len(page.items),
+                    self.credential.id,
+                )
+                for raw in page.items:
+                    created = await self._upsert_listing(raw)
+                    if created:
+                        result.created += 1
+                    else:
+                        result.updated += 1
+                next_token = page.next_token
+                state.next_token = next_token
+                await self.db.flush()
+                if not next_token:
+                    break
+            state.status = SyncStatus.IDLE
+            state.last_error = None
+            logger.info(
+                "Amazon sync 'listings' completed: created=%s updated=%s (credential=%s)",
+                result.created,
+                result.updated,
+                self.credential.id,
+            )
+        except Exception as exc:
+            state.status = SyncStatus.ERROR
+            state.last_error = str(exc)[:2000]
+            logger.exception(
+                "Amazon sync 'listings' failed (credential=%s '%s')",
+                self.credential.id,
+                self.credential.label,
+            )
+            raise
+        finally:
+            state.last_synced_at = datetime.now(UTC)
+            state.records_last_sync = result.total
+            await self.db.flush()
+        return result
+
+    async def _upsert_listing(self, raw: dict[str, Any]) -> bool:
+        # One summary per marketplace; we always query a single marketplace.
+        summary = (raw.get("summaries") or [{}])[0]
+        values = {
+            "credential_id": self.credential.id,
+            "seller_sku": raw["sku"],
+            "asin": summary.get("asin"),
+            "product_type": summary.get("productType"),
+            "item_name": (summary.get("itemName") or "")[:500] or None,
+            "condition_type": summary.get("conditionType"),
+            "status": summary.get("status") or [],
+            "main_image_url": (summary.get("mainImage") or {}).get("link"),
+            "listing_created_at": _parse_amazon_dt(summary.get("createdDate")),
+            "listing_updated_at": _parse_amazon_dt(summary.get("lastUpdatedDate")),
+        }
+        stmt = pg_insert(AmazonListing).values(**values)
+        update_cols = {
+            k: stmt.excluded[k] for k in values if k not in ("credential_id", "seller_sku")
+        }
+        update_cols["updated_at"] = func.now()
+        stmt = stmt.on_conflict_do_update(
+            constraint="uq_amazon_listing", set_=update_cols
+        ).returning(AmazonListing.id, literal_column("(xmax = 0)").label("inserted"))
+        row = (await self.db.execute(stmt)).one()
+        return bool(row.inserted)
 
     # --- Inventory ---------------------------------------------------------------
 
@@ -529,6 +614,7 @@ class AmazonSyncService:
     async def sync_all(self) -> list[SyncResult]:
         return [
             await self.sync_orders(),
+            await self.sync_listings(),
             await self.sync_inventory(),
             await self.sync_fba_shipments(),
             await self.sync_financial_events(),

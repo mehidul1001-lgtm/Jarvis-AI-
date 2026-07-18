@@ -14,6 +14,7 @@ class FakeAmazonClient:
     def __init__(self) -> None:
         self._pages: dict[str, list[AmazonPage]] = {
             "orders": [],
+            "listings": [],
             "inventory": [],
             "fba_shipments": [],
             "financial_events": [],
@@ -28,6 +29,9 @@ class FakeAmazonClient:
 
     def queue_orders(self, *pages: AmazonPage) -> None:
         self._pages["orders"].extend(pages)
+
+    def queue_listings(self, *pages: AmazonPage) -> None:
+        self._pages["listings"].extend(pages)
 
     def queue_inventory(self, *pages: AmazonPage) -> None:
         self._pages["inventory"].extend(pages)
@@ -50,6 +54,11 @@ class FakeAmazonClient:
     async def list_order_items(self, amazon_order_id: str) -> list[dict[str, Any]]:
         self.calls.append(("list_order_items", {"amazon_order_id": amazon_order_id}))
         return self.order_items.get(amazon_order_id, [])
+
+    async def search_listings_items(self, *, next_token: str | None = None) -> AmazonPage:
+        self.calls.append(("search_listings_items", {"next_token": next_token}))
+        pages = self._pages["listings"]
+        return pages.pop(0) if pages else AmazonPage()
 
     async def list_inventory_summaries(self, *, next_token: str | None = None) -> AmazonPage:
         self.calls.append(("list_inventory_summaries", {"next_token": next_token}))

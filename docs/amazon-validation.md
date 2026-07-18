@@ -29,7 +29,8 @@ You only need to do this once.
    **Orders**, **Inventory and Order Tracking**, **Amazon Fulfillment**,
    and **Finance and Accounts Management**. (Amazon's exact wording for
    these role names shifts slightly release to release — pick whichever
-   options cover orders, FBA inventory/shipments, and financial events.)
+   options cover orders, product listings, FBA inventory/shipments, and
+   financial events.)
 5. Save. Amazon issues an **LWA Client ID**
    (`amzn1.application-oa2-client...`) and an **LWA Client Secret** —
    copy both somewhere safe (a password manager, not a chat window).
@@ -92,7 +93,7 @@ app uses, not a separate diagnostic shim. It:
 1. Exchanges your refresh token for an LWA access token.
 2. Calls the Sellers API to confirm these credentials are actually
    authorized for the marketplace you expect.
-3. Runs a full sync (orders, FBA inventory, FBA inbound shipments,
+3. Runs a full sync (orders, listings, FBA inventory, FBA inbound shipments,
    financial events) and writes the results into your real database — this
    *is* connecting the account, not a dry run.
 4. Prints reconciliation tables: recent orders, 30-day sales, inventory per
@@ -172,6 +173,7 @@ eyeballing them against Seller Central:
 |---|---|
 | Sales (order count, revenue, AOV) | Reports → Business Reports |
 | Recent orders | Orders → Manage Orders |
+| Listings (SKU/ASIN/status) | Inventory → Manage All Inventory |
 | FBA inventory per SKU | Inventory → Manage FBA Inventory |
 | FBA inbound shipments | Inventory → Manage FBA Shipments |
 | Financial events by type | Reports → Payments |

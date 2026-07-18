@@ -13,6 +13,7 @@ from app.schemas.amazon import (
     AmazonCredentialCreate,
     AmazonCredentialOut,
     AmazonDashboardOut,
+    AmazonListingOut,
     AmazonOrderOut,
     AmazonSyncStateOut,
     FbaShipmentOut,
@@ -135,6 +136,28 @@ async def sales_summary(
         user, credential_id, start=range_start, end=range_end
     )
     return SalesSummaryOut(**summary)
+
+
+# --- Listings -----------------------------------------------------------------
+
+
+@router.get("/credentials/{credential_id}/listings", response_model=Page[AmazonListingOut])
+async def listings(
+    credential_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbSession,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> Page[AmazonListingOut]:
+    items, total = await AmazonDataService(db).list_listings(
+        user, credential_id, page=page, page_size=page_size
+    )
+    return Page(
+        items=[AmazonListingOut.model_validate(item) for item in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 # --- Inventory ------------------------------------------------------------------

@@ -115,8 +115,8 @@ npm run build                     # strict TypeScript compile + production build
 ## Amazon integration
 
 Phase 3a connects the Amazon agent to a real Seller Central account via the
-Selling Partner API (SP-API): orders, sales, FBA inventory, FBA inbound
-shipments and financial events sync on a recurring schedule and become
+Selling Partner API (SP-API): orders, sales, listings, FBA inventory, FBA
+inbound shipments and financial events sync on a recurring schedule and become
 queryable by the six agents and the REST API under `/api/v1/amazon/...`.
 
 Amazon's 2023 SP-API migration removed the AWS SigV4/IAM-role signing

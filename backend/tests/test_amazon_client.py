@@ -28,6 +28,7 @@ def _client(handler) -> tuple[SPAPIClient, httpx.AsyncClient]:
         lwa_client_id="client-id",
         lwa_client_secret="client-secret",
         lwa_refresh_token="refresh-token",
+        seller_id="A1B2C3D4E5",
         http_client=http,
     )
     return client, http
@@ -142,6 +143,77 @@ async def test_list_orders_pagination_next_token():
     page2 = await client.list_orders(created_after=datetime.now(UTC), next_token=page1.next_token)
     assert page2.items[0]["AmazonOrderId"] == "page2"
     assert page2.next_token is None
+    await client.aclose()
+    await http.aclose()
+
+
+# --- Listings ------------------------------------------------------------------------
+
+
+async def test_search_listings_items_pages_and_parses():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth/o2/token":
+            return LWA_OK
+        assert request.url.path == "/listings/2021-08-01/items/A1B2C3D4E5"
+        assert request.url.params["marketplaceIds"] == "ATVPDKIKX0DER"
+        if "pageToken" in request.url.params:
+            return httpx.Response(
+                200,
+                json={
+                    "numberOfResults": 2,
+                    "items": [{"sku": "SKU-2", "summaries": [{"asin": "B000000002"}]}],
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "numberOfResults": 2,
+                "pagination": {"nextToken": "page-2"},
+                "items": [
+                    {
+                        "sku": "SKU-1",
+                        "summaries": [
+                            {
+                                "marketplaceId": "ATVPDKIKX0DER",
+                                "asin": "B000000001",
+                                "productType": "CUTTING_BOARD",
+                                "conditionType": "new_new",
+                                "status": ["BUYABLE", "DISCOVERABLE"],
+                                "itemName": "Bamboo Cutting Board",
+                                "createdDate": "2025-01-15T00:00:00Z",
+                                "lastUpdatedDate": "2026-06-01T00:00:00Z",
+                                "mainImage": {"link": "https://img.example/1.jpg"},
+                            }
+                        ],
+                    }
+                ],
+            },
+        )
+
+    client, http = _client(handler)
+    page1 = await client.search_listings_items()
+    assert page1.next_token == "page-2"
+    assert page1.items[0]["sku"] == "SKU-1"
+    assert page1.items[0]["summaries"][0]["status"] == ["BUYABLE", "DISCOVERABLE"]
+    page2 = await client.search_listings_items(next_token=page1.next_token)
+    assert page2.items[0]["sku"] == "SKU-2"
+    assert page2.next_token is None
+    await client.aclose()
+    await http.aclose()
+
+
+async def test_search_listings_requires_seller_id():
+    http = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: LWA_OK))
+    client = SPAPIClient(
+        region="NA",
+        marketplace_id="ATVPDKIKX0DER",
+        lwa_client_id="id",
+        lwa_client_secret="secret",
+        lwa_refresh_token="refresh",
+        http_client=http,
+    )
+    with pytest.raises(SPAPIError):
+        await client.search_listings_items()
     await client.aclose()
     await http.aclose()
 

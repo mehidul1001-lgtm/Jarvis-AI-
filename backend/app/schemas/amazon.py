@@ -49,7 +49,8 @@ class AmazonSyncStateOut(BaseModel):
 
 class SyncTriggerRequest(BaseModel):
     resource: str = Field(
-        default="all", pattern="^(all|orders|inventory|fba_shipments|financial_events)$"
+        default="all",
+        pattern="^(all|orders|listings|inventory|fba_shipments|financial_events)$",
     )
     recurring: bool = False
 
@@ -95,6 +96,22 @@ class SalesSummaryOut(BaseModel):
     total_revenue: Decimal
     currency: str | None
     average_order_value: Decimal
+
+
+# --- Listings -----------------------------------------------------------------
+
+
+class AmazonListingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    seller_sku: str
+    asin: str | None
+    product_type: str | None
+    item_name: str | None
+    condition_type: str | None
+    status: list[str] | None
+    main_image_url: str | None
+    listing_updated_at: datetime | None
 
 
 # --- Inventory ----------------------------------------------------------------

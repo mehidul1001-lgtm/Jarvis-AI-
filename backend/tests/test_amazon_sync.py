@@ -18,6 +18,7 @@ from app.models.amazon import (
     AmazonFbaShipment,
     AmazonFinancialEvent,
     AmazonInventorySnapshot,
+    AmazonListing,
     AmazonOrder,
     AmazonRegion,
     AmazonSyncState,
@@ -172,6 +173,85 @@ async def test_sync_orders_paginates_until_next_token_exhausted(credential):
         list_calls = [c for c in fake.calls if c[0] == "list_orders"]
         assert len(list_calls) == 2
         assert list_calls[1][1]["next_token"] == "page-2"
+
+
+# --- Listings ----------------------------------------------------------------------
+
+
+def _listing(sku: str, status: list[str] | None = None) -> dict:
+    return {
+        "sku": sku,
+        "summaries": [
+            {
+                "marketplaceId": "ATVPDKIKX0DER",
+                "asin": "B000000001",
+                "productType": "CUTTING_BOARD",
+                "conditionType": "new_new",
+                "status": status if status is not None else ["BUYABLE"],
+                "itemName": "Bamboo Cutting Board",
+                "createdDate": "2025-01-15T00:00:00Z",
+                "lastUpdatedDate": "2026-06-01T00:00:00Z",
+                "mainImage": {"link": "https://img.example/1.jpg"},
+            }
+        ],
+    }
+
+
+async def test_sync_listings_creates_and_paginates(credential):
+    async with db.sessionmaker() as session:
+        fake = FakeAmazonClient()
+        fake.queue_listings(
+            AmazonPage(items=[_listing("SKU-A")], next_token="page-2"),
+            AmazonPage(items=[_listing("SKU-B")], next_token=None),
+        )
+        result = await AmazonSyncService(session, credential, fake).sync_listings()
+        await session.commit()
+
+        assert result.created == 2
+        rows = (
+            (
+                await session.execute(
+                    select(AmazonListing)
+                    .where(AmazonListing.credential_id == credential.id)
+                    .order_by(AmazonListing.seller_sku)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert [r.seller_sku for r in rows] == ["SKU-A", "SKU-B"]
+        assert rows[0].asin == "B000000001"
+        assert rows[0].status == ["BUYABLE"]
+        assert rows[0].item_name == "Bamboo Cutting Board"
+
+
+async def test_sync_listings_upsert_is_idempotent(credential):
+    async with db.sessionmaker() as session:
+        fake = FakeAmazonClient()
+        fake.queue_listings(AmazonPage(items=[_listing("SKU-C")]))
+        result1 = await AmazonSyncService(session, credential, fake).sync_listings()
+        await session.commit()
+        assert result1.created == 1
+
+        # Re-sync with a changed status - must update in place, not duplicate.
+        fake2 = FakeAmazonClient()
+        fake2.queue_listings(AmazonPage(items=[_listing("SKU-C", status=[])]))
+        result2 = await AmazonSyncService(session, credential, fake2).sync_listings()
+        await session.commit()
+        assert result2.created == 0
+        assert result2.updated == 1
+
+        rows = (
+            (
+                await session.execute(
+                    select(AmazonListing).where(AmazonListing.seller_sku == "SKU-C")
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(rows) == 1
+        assert rows[0].status == []
 
 
 # --- Inventory ---------------------------------------------------------------------
@@ -341,6 +421,7 @@ async def test_sync_all_runs_every_resource(credential):
         await session.commit()
         assert {r.resource for r in results} == {
             "orders",
+            "listings",
             "inventory",
             "fba_shipments",
             "financial_events",
